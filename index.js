@@ -10,6 +10,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildInvites,
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User],
 });
@@ -42,8 +43,20 @@ for (const file of commandFiles) {
     commands.push(command.data.toJSON());
 }
 
+client.invites = new Map();
+
 client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
+
+    // Cache all initial invites for the invite tracker
+    client.guilds.cache.forEach(async (guild) => {
+        try {
+            const firstInvites = await guild.invites.fetch();
+            client.invites.set(guild.id, new Map(firstInvites.map((invite) => [invite.code, invite.uses])));
+        } catch (err) {
+            console.error('Failed to cache invites for guild:', guild.id);
+        }
+    });
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {

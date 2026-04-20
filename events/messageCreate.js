@@ -142,6 +142,47 @@ module.exports = {
                  // Usually happens if bot lacks Manage Messages permission
                  console.error('Failed to moderate message:', error);
             }
+        } else {
+            // Level System XP Logic
+            const fs = require('fs');
+            const path = require('path');
+            const levelsPath = path.join(__dirname, '..', 'levels.json');
+            
+            let levelsData = {};
+            if (fs.existsSync(levelsPath)) {
+                try { levelsData = JSON.parse(fs.readFileSync(levelsPath, 'utf8')); } catch(e){}
+            }
+
+            const userId = message.author.id;
+            if (!levelsData[userId]) {
+                levelsData[userId] = { xp: 0, level: 1, lastMessageEvent: 0 };
+            }
+
+            const now2 = Date.now();
+            // 60-second cooldown
+            if (now2 - levelsData[userId].lastMessageEvent > 60000) {
+                const xpGain = Math.floor(Math.random() * 11) + 15; // 15 to 25 XP
+                levelsData[userId].xp += xpGain;
+                levelsData[userId].lastMessageEvent = now2;
+
+                const curLevel = levelsData[userId].level;
+                const xpNeeded = curLevel * 100; // e.g level 3 needs 300 xp to hit level 4
+                
+                if (levelsData[userId].xp >= xpNeeded) {
+                    levelsData[userId].level += 1;
+                    levelsData[userId].xp -= xpNeeded; // carry over remaining xp
+                    
+                    const levelEmbed = new EmbedBuilder()
+                        .setTitle('🎉 Level Up!')
+                        .setColor('#f39c12')
+                        .setDescription(`Congratulations **${message.author.username}**! You just leveled up to **Level ${levelsData[userId].level}**!`)
+                        .setThumbnail(message.author.displayAvatarURL());
+                        
+                    message.channel.send({ content: `${message.author}`, embeds: [levelEmbed] }).catch(()=>{});
+                }
+                
+                fs.writeFileSync(levelsPath, JSON.stringify(levelsData, null, 2));
+            }
         }
     },
 };

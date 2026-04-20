@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 
 module.exports = {
     name: 'guildMemberAdd',
-    async execute(member) {
+    async execute(member, client) {
         // Ensure the bot applies the Unverified role right away.
         let unverifiedRole = member.guild.roles.cache.find(r => r.name.toLowerCase() === 'unverified');
         
@@ -25,6 +25,44 @@ module.exports = {
             console.error('Error adding unverified role:', error);
         }
 
+        // Invite Tracking Logic
+        let inviterText = '';
+        if (client && client.invites) {
+            try {
+                const newInvites = await member.guild.invites.fetch();
+                const oldInvites = client.invites.get(member.guild.id);
+                
+                // Find which invite's use count went up
+                const invite = newInvites.find(i => {
+                    const oldInviteUses = (oldInvites && oldInvites.get(i.code)) || 0;
+                    return i.uses > oldInviteUses;
+                });
+
+                if (invite && invite.inviter) {
+                    const dataPath = require('path').join(__dirname, '..', 'invites.json');
+                    const fs = require('fs');
+                    
+                    let inviteData = {};
+                    if (fs.existsSync(dataPath)) {
+                        try { inviteData = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch(e){}
+                    }
+                    
+                    const inviterId = invite.inviter.id;
+                    if (!inviteData[inviterId]) inviteData[inviterId] = 0;
+                    inviteData[inviterId] += 1;
+                    
+                    fs.writeFileSync(dataPath, JSON.stringify(inviteData, null, 2));
+
+                    inviterText = `\n\n📫 **Invited by:** <@${inviterId}> (${inviteData[inviterId]} invites)`;
+                }
+
+                // Push new mapping to cache
+                client.invites.set(member.guild.id, new Map(newInvites.map((i) => [i.code, i.uses])));
+            } catch (error) {
+                console.error('Invite tracking error:', error);
+            }
+        }
+
         // Welcome Embed
         const welcomeChannelId = '1494768368425636013';
         const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
@@ -32,7 +70,7 @@ module.exports = {
         if (welcomeChannel) {
              const welcomeEmbed = new EmbedBuilder()
                 .setTitle(`🌟 Welcome to ${member.guild.name}! 🌟`)
-                .setDescription(`Hey ${member}, we're incredibly excited to have you here in the central hub for all fandoms!\n\n🔒 **Important:** To unlock the rest of the server and start chatting with everyone, please head over to the Verification channel and click the green button!`)
+                .setDescription(`Hey ${member}, we're incredibly excited to have you here in the central hub for all fandoms!\n\n🔒 **Important:** To unlock the rest of the server and start chatting with everyone, please head over to the Verification channel and click the green button!${inviterText}`)
                 .setColor('#9b59b6')
                 .setThumbnail(member.user.displayAvatarURL())
                 .setTimestamp();
