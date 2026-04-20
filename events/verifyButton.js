@@ -1,3 +1,5 @@
+const { EmbedBuilder } = require('discord.js');
+
 module.exports = {
     name: 'verifyButton',
     async execute(interaction) {
@@ -22,6 +24,21 @@ module.exports = {
             }
 
             await interaction.reply({ content: 'You have been successfully verified!', ephemeral: true });
+
+            const logChannelId = '1494775931053670430';
+            const logChannel = interaction.guild.channels.cache.get(logChannelId);
+            if (logChannel) {
+                const logEmbed = new EmbedBuilder()
+                    .setTitle('✅ User Verified')
+                    .setColor('#2ecc71')
+                    .addFields(
+                        { name: 'User', value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+                        { name: 'User ID', value: interaction.user.id, inline: true }
+                    )
+                    .setThumbnail(interaction.user.displayAvatarURL())
+                    .setTimestamp();
+                await logChannel.send({ embeds: [logEmbed] });
+            }
 
         } catch (error) {
             console.error('Error during verification:', error);

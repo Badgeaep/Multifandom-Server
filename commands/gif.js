@@ -1,21 +1,56 @@
-const { SlashCommandBuilder } = require('discord.js');
-// In a real scenario, you'd use a package like 'node-fetch' to call the Tenor or Giphy API
-// For simplicity and since we don't have a Tenor key, we'll construct a simple tenor search link.
+const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const axios = require('axios');
+const sharp = require('sharp');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('gif')
-        .setDescription('Search for a gif.')
-        .addStringOption(option => 
-            option.setName('search')
-                .setDescription('The term to search for')
-                .setRequired(true)),
+        .setDescription('Upload a photo to chat and convert it to a favorite-able gif!')
+        .addAttachmentOption(option => 
+            option.setName('file')
+                .setDescription('Upload your image file here')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('link')
+                .setDescription('Or paste a direct Tenor or Giphy link here')
+                .setRequired(false)),
     async execute(interaction) {
-        const searchTerm = interaction.options.getString('search');
-        
-        // As a fallback without an API key, Discord usually unfurls these tenor search links into the top gif
-        const gifLink = `https://tenor.com/search/${encodeURIComponent(searchTerm)}-gifs`;
+        await interaction.deferReply();
 
-        await interaction.reply(gifLink);
+        const file = interaction.options.getAttachment('file');
+        const link = interaction.options.getString('link');
+
+        if (file) {
+            try {
+                // Fetch the high-quality image from Discord
+                const response = await axios.get(file.url, { responseType: 'arraybuffer' });
+                
+                let gifBuffer;
+                if (!file.contentType.includes('gif')) {
+                    // Maximum effort true GIF conversion 
+                    // This is the absolute highest quality compression possible to minimize color destruction!
+                    gifBuffer = await sharp(response.data)
+                        .gif({ 
+                            colors: 256, // Max limit for gif format
+                            dither: 1.0, // Best gradient smoothing
+                            effort: 10   // Max CPU encoding effort
+                        })
+                        .toBuffer();
+                } else {
+                    gifBuffer = response.data; // Already a real gif
+                }
+
+                // Send the authentically converted GIF
+                const attachment = new AttachmentBuilder(gifBuffer, { name: 'hq_converted.gif' });
+                await interaction.editReply({ files: [attachment] });
+            } catch (error) {
+                console.error(error);
+                await interaction.editReply({ content: 'Sorry, there was an issue converting your photo.' });
+            }
+        } else if (link) {
+            await interaction.editReply({ content: link });
+        } else {
+            await interaction.editReply({ content: 'You need to attach a file or provide a link!' });
+        }
     },
 };
