@@ -19,13 +19,17 @@ module.exports = {
         }
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
-        const data = levelsData[targetUser.id] || { xp: 0, level: 1 };
+        const rawData = levelsData[targetUser.id] || {};
+        const data = {
+            xp: rawData.xp || 0,
+            level: rawData.level || 1
+        };
 
         const xpNeeded = data.level * 100;
         
         // Simple visual ASCII progress bar mapping
-        const progress = Math.min(100, Math.floor((data.xp / xpNeeded) * 100));
-        const blocks = Math.floor(progress / 10);
+        const progress = Math.max(0, Math.min(100, Math.floor((data.xp / xpNeeded) * 100)));
+        const blocks = Math.max(0, Math.min(10, Math.floor(progress / 10)));
         const bar = '🟩'.repeat(blocks) + '⬛'.repeat(10 - blocks);
 
         const embed = new EmbedBuilder()

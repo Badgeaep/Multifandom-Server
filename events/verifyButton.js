@@ -25,6 +25,17 @@ module.exports = {
 
             await interaction.reply({ content: 'You have been successfully verified!', ephemeral: true });
 
+            const fs = require('fs');
+            const path = require('path');
+            const userDataPath = path.join(__dirname, '..', 'userdata.json');
+            let uData = {};
+            if (fs.existsSync(userDataPath)) {
+                try { uData = JSON.parse(fs.readFileSync(userDataPath, 'utf8')); } catch(e){}
+            }
+            if (!uData[interaction.user.id]) uData[interaction.user.id] = {};
+            uData[interaction.user.id].verifiedAt = Date.now();
+            fs.writeFileSync(userDataPath, JSON.stringify(uData, null, 2));
+
             const logChannelId = '1494775931053670430';
             const logChannel = interaction.guild.channels.cache.get(logChannelId);
             if (logChannel) {

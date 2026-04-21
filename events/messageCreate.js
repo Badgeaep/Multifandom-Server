@@ -45,9 +45,7 @@ module.exports = {
 
         // Check for bypass role
         const member = message.member;
-        if (member && member.roles.cache.has(BYPASS_ROLE_ID)) {
-            return;
-        }
+        const isBypass = member && member.roles.cache.has(BYPASS_ROLE_ID);
 
         let content = message.content.toLowerCase();
         // Remove spaces for checking clever evasion like "H I T L E R"
@@ -55,7 +53,9 @@ module.exports = {
         let shouldDelete = false;
         let reason = '';
 
-        // 1. Extreme Curse/Racist Filter
+        // Only run automod filters if the user doesn't have the bypass role
+        if (!isBypass) {
+            // 1. Extreme Curse/Racist Filter
         for (const regex of badWordsRegex) {
             const match = content.match(regex) || squishedContent.match(regex);
             if (match) {
@@ -105,6 +105,8 @@ module.exports = {
             }
         }
 
+        } // End of !isBypass block
+
         // Execution
         if (shouldDelete) {
             try {
@@ -138,6 +140,19 @@ module.exports = {
                     await logChannel.send({ embeds: [logEmbed] });
                 }
 
+                // Save warning to warnings.json
+                const fs = require('fs');
+                const path = require('path');
+                const warningsPath = path.join(__dirname, '..', 'warnings.json');
+                let warningsData = {};
+                if (fs.existsSync(warningsPath)) {
+                    try { warningsData = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch(e){}
+                }
+                const uid = message.author.id;
+                if (!warningsData[uid]) warningsData[uid] = 0;
+                warningsData[uid] += 1;
+                fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+
             } catch (error) {
                  // Usually happens if bot lacks Manage Messages permission
                  console.error('Failed to moderate message:', error);
@@ -159,9 +174,9 @@ module.exports = {
             }
 
             const now2 = Date.now();
-            // 60-second cooldown
-            if (now2 - levelsData[userId].lastMessageEvent > 60000) {
-                const xpGain = Math.floor(Math.random() * 11) + 15; // 15 to 25 XP
+            // 3-second cooldown
+            if (now2 - (levelsData[userId].lastMessageEvent || 0) > 3000) {
+                const xpGain = Math.floor(Math.random() * 3) + 1; // 1 to 3 XP
                 levelsData[userId].xp += xpGain;
                 levelsData[userId].lastMessageEvent = now2;
 
