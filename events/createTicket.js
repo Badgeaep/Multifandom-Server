@@ -38,6 +38,9 @@ module.exports = {
         const row = new ActionRowBuilder().addComponents(button);
 
         await ticketChannel.send({ content: `${user}`, embeds: [embed], components: [row] });
-        await interaction.reply({ content: `Your ticket has been created: ${ticketChannel}`, ephemeral: true });
+        const replyEmbed = new EmbedBuilder()
+            .setColor('#2ecc71')
+            .setDescription(`✅ Your ticket has been created: ${ticketChannel}`);
+        await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
     },
 };

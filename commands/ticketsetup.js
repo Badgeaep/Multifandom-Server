@@ -20,6 +20,9 @@ module.exports = {
         const row = new ActionRowBuilder().addComponents(button);
 
         await interaction.channel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: 'Ticket system setup complete!', ephemeral: true });
+        const replyEmbed = new EmbedBuilder()
+            .setColor('#2ecc71')
+            .setDescription('✅ Ticket system setup complete!');
+        await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
     },
 };

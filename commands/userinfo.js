@@ -1,10 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const levelsPath = path.join(__dirname, '..', 'levels.json');
-const warningsPath = path.join(__dirname, '..', 'warnings.json');
-const userDataPath = path.join(__dirname, '..', 'userdata.json');
+const { getData } = require('../db');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -20,11 +15,9 @@ module.exports = {
         const targetUser = interaction.options.getUser('user');
         const targetMember = await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
-        // Load files
-        let levelsData = {}, warningsData = {}, userData = {};
-        if (fs.existsSync(levelsPath)) try { levelsData = JSON.parse(fs.readFileSync(levelsPath, 'utf8')); } catch(e){}
-        if (fs.existsSync(warningsPath)) try { warningsData = JSON.parse(fs.readFileSync(warningsPath, 'utf8')); } catch(e){}
-        if (fs.existsSync(userDataPath)) try { userData = JSON.parse(fs.readFileSync(userDataPath, 'utf8')); } catch(e){}
+        const levelsData = getData('levels');
+        const warningsData = getData('warnings');
+        const userData = getData('userdata');
 
         const uLevel = levelsData[targetUser.id] || { level: 1, xp: 0 };
         const uWarnings = warningsData[targetUser.id] || 0;
@@ -51,9 +44,15 @@ module.exports = {
             );
 
         if (targetMember) {
+            const isTimedOut = targetMember.isCommunicationDisabled() ? `<t:${Math.floor(targetMember.communicationDisabledUntilTimestamp / 1000)}:R>` : 'No';
+            const isBoosting = targetMember.premiumSinceTimestamp ? `<t:${Math.floor(targetMember.premiumSinceTimestamp / 1000)}:R>` : 'Not boosting';
+            
             embed.addFields(
                 { name: '📌 Server Nickname', value: targetMember.nickname || 'None', inline: true },
                 { name: '📥 Joined Server', value: `<t:${Math.floor(targetMember.joinedTimestamp / 1000)}:R>`, inline: true },
+                { name: '👑 Highest Role', value: targetMember.roles.highest ? targetMember.roles.highest.toString() : 'None', inline: true },
+                { name: '🔇 Timed Out?', value: isTimedOut, inline: true },
+                { name: '💎 Server Booster', value: isBoosting, inline: true },
                 { name: '🎭 Roles', value: targetMember.roles.cache.map(r => r).join(', ').substring(0, 1024) || 'None', inline: false }
             );
         } else {

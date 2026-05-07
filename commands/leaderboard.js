@@ -1,18 +1,14 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const dataPath = path.join(__dirname, '..', 'levels.json');
+const { SlashCommandBuilder, EmbedBuilder, InteractionContextType, ApplicationIntegrationType } = require('discord.js');
+const { getData } = require('../db');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('leaderboard')
-        .setDescription('View the Top 10 users with the highest level.'),
+        .setDescription('View the Top 10 users with the highest level.')
+        .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel])
+        .setIntegrationTypes([ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall]),
     async execute(interaction) {
-        let levelsData = {};
-        if (fs.existsSync(dataPath)) {
-            try { levelsData = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch(e){}
-        }
+        let levelsData = getData('levels');
 
         // Convert the object into an array: [{ id: '123', xp: 50, level: 2 }, ...]
         // Default missing values to 0/1 so we don't break sorting

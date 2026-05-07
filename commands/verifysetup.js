@@ -10,7 +10,10 @@ module.exports = {
         const verifyChannel = interaction.guild.channels.cache.get(verifyChannelId);
 
         if (!verifyChannel) {
-            return interaction.reply({ content: `Could not find the verification channel with ID ${verifyChannelId}. Make sure it exists!`, ephemeral: true });
+            const errEmbed = new EmbedBuilder()
+                .setColor('#e74c3c')
+                .setDescription(`❌ Could not find the verification channel with ID ${verifyChannelId}. Make sure it exists!`);
+            return interaction.reply({ embeds: [errEmbed], ephemeral: true });
         }
 
         const embed = new EmbedBuilder()
@@ -27,6 +30,9 @@ module.exports = {
         const row = new ActionRowBuilder().addComponents(button);
 
         await verifyChannel.send({ embeds: [embed], components: [row] });
-        await interaction.reply({ content: `Verification system setup complete in <#${verifyChannelId}>!`, ephemeral: true });
+        const replyEmbed = new EmbedBuilder()
+            .setColor('#2ecc71')
+            .setDescription(`✅ Verification system setup complete in <#${verifyChannelId}>!`);
+        await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
     },
 };

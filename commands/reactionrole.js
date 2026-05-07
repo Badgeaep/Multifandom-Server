@@ -1,8 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const dataPath = path.join(__dirname, '..', 'reaction_roles.json');
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { getData, saveData } = require('../db');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -32,21 +29,18 @@ module.exports = {
         try {
             message = await interaction.channel.messages.fetch(messageId);
         } catch (err) {
-            return interaction.editReply({ content: 'Could not find that message ID in this channel! Please run this command in the same channel as the message.' });
+            const errEmbed = new EmbedBuilder().setColor('#e74c3c').setDescription('❌ Could not find that message ID in this channel! Please run this command in the same channel as the message.');
+            return interaction.editReply({ embeds: [errEmbed] });
         }
 
         try {
             await message.react(emojiStr);
         } catch (err) {
-            return interaction.editReply({ content: `Failed to react to the message with Emoji \`${emojiStr}\`. Error: ${err.message}` });
+            const errEmbed = new EmbedBuilder().setColor('#e74c3c').setDescription(`❌ Failed to react to the message with Emoji \`${emojiStr}\`. Error: ${err.message}`);
+            return interaction.editReply({ embeds: [errEmbed] });
         }
 
-        let reactionData = {};
-        if (fs.existsSync(dataPath)) {
-            try {
-                reactionData = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-            } catch (err) {}
-        }
+        let reactionData = getData('reaction_roles');
 
         if (!reactionData[messageId]) {
             reactionData[messageId] = {};
@@ -59,8 +53,9 @@ module.exports = {
         }
 
         reactionData[messageId][emojiKey] = role.id;
-        fs.writeFileSync(dataPath, JSON.stringify(reactionData, null, 2));
+        saveData('reaction_roles', reactionData);
 
-        await interaction.editReply({ content: `✅ Successfully bound emoji ${emojiStr} to role **${role.name}** on message \`${messageId}\`!` });
+        const successEmbed = new EmbedBuilder().setColor('#2ecc71').setDescription(`✅ Successfully bound emoji ${emojiStr} to role **${role.name}** on message \`${messageId}\`!`);
+        await interaction.editReply({ embeds: [successEmbed] });
     },
 };

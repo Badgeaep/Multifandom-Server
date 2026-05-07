@@ -1,7 +1,9 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, REST, Routes, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, InteractionContextType, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { getData } = require('./db');
+const { PermissionFlagsBits } = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -11,8 +13,10 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildInvites,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.DirectMessageReactions,
     ],
-    partials: [Partials.Message, Partials.Reaction, Partials.User],
+    partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel],
 });
 
 client.commands = new Collection();
@@ -43,35 +47,28 @@ for (const file of commandFiles) {
     commands.push(command.data.toJSON());
 }
 
-client.invites = new Map();
-
-client.once('ready', async () => {
-    console.log(`Logged in as ${client.user.tag}!`);
-
-    // Cache all initial invites for the invite tracker
-    client.guilds.cache.forEach(async (guild) => {
-        try {
-            const firstInvites = await guild.invites.fetch();
-            client.invites.set(guild.id, new Map(firstInvites.map((invite) => [invite.code, invite.uses])));
-        } catch (err) {
-            console.error('Failed to cache invites for guild:', guild.id);
-        }
-    });
-
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-    try {
-        console.log('Started refreshing application (/) commands.');
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands },
-        );
-        console.log('Successfully reloaded application (/) commands.');
-    } catch (error) {
-        console.error(error);
-    }
-});
 
 client.on('interactionCreate', async (interaction) => {
+    // --- EMERGENCY NUKE CHECK ---
+    const config = getData('systemConfig');
+    if (config.nukeActive) {
+        const isAdmin = interaction.member && interaction.member.permissions.has(PermissionFlagsBits.Administrator);
+        const isNukeCommand = interaction.isChatInputCommand() && interaction.commandName === 'nuke';
+
+        // Block everything except admins running the /nuke command
+        if (!isAdmin || !isNukeCommand) {
+            const emergencyEmbed = new EmbedBuilder()
+                .setTitle('☢️ SYSTEM LOCK-DOWN')
+                .setColor('#ff4757')
+                .setDescription('The bot is currently in **Emergency Lock-down Mode**. All functions have been disabled by an administrator.')
+                .addFields({ name: 'Reason', value: config.nukeReason || 'No reason provided.' })
+                .setTimestamp()
+                .setFooter({ text: 'Emergency Shutdown System' });
+
+            return interaction.reply({ embeds: [emergencyEmbed], ephemeral: true });
+        }
+    }
+
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
@@ -97,6 +94,31 @@ client.on('interactionCreate', async (interaction) => {
              } else if (interaction.customId === 'close_ticket') {
                 const closeTicketEvent = require('./events/closeTicket');
                 await closeTicketEvent.execute(interaction);
+             } else if (interaction.customId.startsWith('delete_toxic_')) {
+                const parts = interaction.customId.split('_');
+                const channelId = parts[2];
+                const messageId = parts[3];
+
+                try {
+                    const channel = await client.channels.fetch(channelId);
+                    if (channel) {
+                        const targetMsg = await channel.messages.fetch(messageId);
+                        if (targetMsg) {
+                            await targetMsg.delete();
+                            
+                            const oldEmbed = interaction.message.embeds[0];
+                            const newEmbed = EmbedBuilder.from(oldEmbed)
+                                .setTitle('🤖 AI AutoMod: Content Deleted')
+                                .setColor('#2ecc71')
+                                .addFields({ name: 'Action By', value: `${interaction.user.tag}`, inline: true });
+                            
+                            await interaction.update({ embeds: [newEmbed], components: [] });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to delete message via button:', err);
+                    await interaction.reply({ content: '❌ Failed to delete the message. It might have already been removed.', ephemeral: true });
+                }
              }
         } catch (error) {
             console.error(error);

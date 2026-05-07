@@ -1,8 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const dataPath = path.join(__dirname, '..', 'invites.json');
+const { getData } = require('../db');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,10 +14,7 @@ module.exports = {
                 .setDescription('Show the top 10 invite leaderboard')
                 .setRequired(false)),
     async execute(interaction) {
-        let inviteData = {};
-        if (fs.existsSync(dataPath)) {
-            try { inviteData = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch(e){}
-        }
+        let inviteData = getData('invites');
 
         const showLeaderboard = interaction.options.getBoolean('leaderboard');
         

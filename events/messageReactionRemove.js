@@ -1,8 +1,5 @@
 const { Events } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const dataPath = path.join(__dirname, '..', 'reaction_roles.json');
+const { getData } = require('../db');
 
 module.exports = {
     name: Events.MessageReactionRemove,
@@ -18,14 +15,7 @@ module.exports = {
             }
         }
 
-        if (!fs.existsSync(dataPath)) return;
-
-        let reactionData;
-        try {
-            reactionData = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-        } catch (err) {
-            return;
-        }
+        let reactionData = getData('reaction_roles');
 
         const messageId = reaction.message.id;
         if (!reactionData[messageId]) return;

@@ -1,22 +1,18 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-
-const dataPath = path.join(__dirname, '..', 'levels.json');
+const { SlashCommandBuilder, EmbedBuilder, InteractionContextType, ApplicationIntegrationType } = require('discord.js');
+const { getData } = require('../db');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('rank')
         .setDescription('Check your current chat level and XP.')
+        .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel])
+        .setIntegrationTypes([ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall])
         .addUserOption(option => 
             option.setName('user')
                 .setDescription('Check another user\'s rank')
                 .setRequired(false)),
     async execute(interaction) {
-        let levelsData = {};
-        if (fs.existsSync(dataPath)) {
-            try { levelsData = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch(e){}
-        }
+        let levelsData = getData('levels');
 
         const targetUser = interaction.options.getUser('user') || interaction.user;
         const rawData = levelsData[targetUser.id] || {};

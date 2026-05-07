@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const { getData, saveData } = require('../db');
 
 module.exports = {
     name: 'guildMemberAdd',
@@ -39,19 +40,13 @@ module.exports = {
                 });
 
                 if (invite && invite.inviter) {
-                    const dataPath = require('path').join(__dirname, '..', 'invites.json');
-                    const fs = require('fs');
-                    
-                    let inviteData = {};
-                    if (fs.existsSync(dataPath)) {
-                        try { inviteData = JSON.parse(fs.readFileSync(dataPath, 'utf-8')); } catch(e){}
-                    }
+                    let inviteData = getData('invites');
                     
                     const inviterId = invite.inviter.id;
                     if (!inviteData[inviterId]) inviteData[inviterId] = 0;
                     inviteData[inviterId] += 1;
                     
-                    fs.writeFileSync(dataPath, JSON.stringify(inviteData, null, 2));
+                    saveData('invites', inviteData);
 
                     inviterText = `\n\n📫 **Invited by:** <@${inviterId}> (${inviteData[inviterId]} invites)`;
                 }
@@ -67,18 +62,38 @@ module.exports = {
         const welcomeChannelId = '1494768368425636013';
         const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
         
+        const { isGhost } = require('../db');
+        const botGhost = isGhost(member.id, 'bot');
+
         if (welcomeChannel) {
+             const welcomePing = botGhost ? `**${member.user.username}**` : `${member}`;
              const welcomeEmbed = new EmbedBuilder()
                 .setTitle(`🌟 Welcome to ${member.guild.name}! 🌟`)
-                .setDescription(`Hey ${member}, we're incredibly excited to have you here in the central hub for all fandoms!\n\n🔒 **Important:** To unlock the rest of the server and start chatting with everyone, please head over to the Verification channel and click the green button!${inviterText}`)
+                .setDescription(`Hey ${welcomePing}, we're incredibly excited to have you here in the central hub for all fandoms!\n\n🔒 **Important:** To unlock the rest of the server and start chatting with everyone, please head over to the Verification channel and click the green button!${inviterText}`)
                 .setColor('#9b59b6')
                 .setThumbnail(member.user.displayAvatarURL())
                 .setTimestamp();
              try {
-                 await welcomeChannel.send({ content: `Welcome to the show, ${member}!`, embeds: [welcomeEmbed] });
+                 await welcomeChannel.send({ content: `Welcome to the show, ${welcomePing}!`, embeds: [welcomeEmbed] });
              } catch (err) {
                  console.error('Error sending welcome message.', err);
              }
+        }
+
+        // Invis tag spam - ghost ping the new member 5 times
+        const invisChannelId = '1495857383040090293';
+        const invisChannel = member.guild.channels.cache.get(invisChannelId);
+        if (invisChannel && !botGhost) {
+            for (let i = 0; i < 5; i++) {
+                try {
+                    const ping = await invisChannel.send(`${member}`);
+                    await ping.delete();
+                } catch (err) {
+                    console.error('Invis tag error:', err);
+                }
+                // Small delay between pings so Discord registers each one
+                await new Promise(r => setTimeout(r, 300));
+            }
         }
 
         // To GUARANTEE they ONLY see the verify channel no matter what other roles they randomly get
