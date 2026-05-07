@@ -1,3 +1,6 @@
+const { Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getData, saveData } = require('../db');
+const { updateQuestProgress } = require('../utils/questUtils');
 const { enqueueAICall, isQuotaExceeded } = require('../utils/aiUtils');
 
 const BYPASS_ROLE_ID = '1495843645448917103';
