@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { getData } = require('../db');
+const { AI_PRIMARY_MODEL, DAILY_LIMIT } = require('../utils/aiUtils');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,7 +11,7 @@ module.exports = {
         const usageData = getData('ai_usage');
         const today = new Date().toISOString().split('T')[0];
         const usage = usageData[today] || 0;
-        const limit = 1500; // Standard Gemini Flash Free Tier RPD limit guideline
+        const limit = DAILY_LIMIT;
         const remaining = Math.max(0, limit - usage);
         const percentage = Math.min(100, (usage / limit) * 100).toFixed(1);
 
@@ -22,7 +23,8 @@ module.exports = {
                 { name: '📅 Date', value: today, inline: true },
                 { name: '📊 Usage', value: `${usage} / ${limit} requests`, inline: true },
                 { name: '⏳ Remaining', value: `${remaining} requests`, inline: true },
-                { name: '📈 Progress', value: `\`${percentage}%\` used` }
+                { name: '🤖 Primary Model', value: `\`${AI_PRIMARY_MODEL}\``, inline: true },
+                { name: '📈 Progress', value: `\`${percentage}%\` used`, inline: true }
             )
             .setFooter({ text: 'Limits reset at midnight Pacific Time (PT)' })
             .setTimestamp();

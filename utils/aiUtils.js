@@ -138,5 +138,7 @@ function enqueueAICall(requestOptions, priority = false) {
 module.exports = {
     enqueueAICall,
     isQuotaExceeded,
-    DAILY_LIMIT
+    DAILY_LIMIT,
+    AI_PRIMARY_MODEL,
+    AI_FALLBACK_MODEL
 };
