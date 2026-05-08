@@ -2,12 +2,13 @@ const { GoogleGenAI } = require('@google/genai');
 const { getData, saveData } = require('../db');
 
 // Models
-const AI_PRIMARY_MODEL = 'gemini-2.5-flash';
-const AI_FALLBACK_MODEL = 'gemini-2.5-flash-lite';
+const AI_PRIMARY_MODEL = 'gemini-2.5-flash-lite';
+const AI_FALLBACK_MODEL = 'gemini-1.5-pro';
 const DAILY_LIMIT = 1500;
 
-// Rate limiting (Safe buffer for 15 RPM free tier)
-const QUEUE_INTERVAL = 4500; // 4.5 seconds between requests
+// Rate limiting (Safe buffer for Gemini API free tier)
+const BASE_QUEUE_INTERVAL = 4000; // 4 seconds between requests (15 RPM)
+let currentBackoff = 0;
 let isProcessing = false;
 const requestQueue = [];
 
@@ -70,16 +71,22 @@ async function processQueue() {
             const text = result.text;
 
             incrementUsage();
+            currentBackoff = 0; // Reset backoff on success
             resolve({ text });
         } catch (err) {
             const status = err?.status || err?.code || (err?.message && err.message.includes('429') ? 429 : 0);
             
             if ((status === 503 || status === 429) && retries < 2) {
-                console.log(`[AI Queue] Rate limited or overloaded (Status: ${status}). Retrying...`);
+                console.log(`[AI Queue] Rate limited (Status: ${status}). Adding backoff and retrying...`);
+                
+                // Increase backoff by 5 seconds on each 429
+                currentBackoff += 5000;
+                
                 // Re-enqueue with incremented retry count
                 requestQueue.unshift({ requestOptions, resolve, reject, retries: retries + 1 });
-                // Wait longer if rate limited
-                await new Promise(r => setTimeout(r, 2000 * (retries + 1)));
+                
+                // Immediate wait for backoff
+                await new Promise(r => setTimeout(r, currentBackoff));
             } else if (retries < 3) {
                 // Try fallback model once
                 try {
@@ -91,6 +98,7 @@ async function processQueue() {
                     });
                     const text = result.text;
                     incrementUsage();
+                    currentBackoff = 0;
                     resolve({ text });
                 } catch (fallbackErr) {
                     reject(err);
@@ -101,7 +109,8 @@ async function processQueue() {
         }
 
         if (requestQueue.length > 0) {
-            await new Promise(r => setTimeout(r, QUEUE_INTERVAL));
+            const waitTime = BASE_QUEUE_INTERVAL + currentBackoff;
+            await new Promise(r => setTimeout(r, waitTime));
         }
     }
 
@@ -111,11 +120,17 @@ async function processQueue() {
 /**
  * Enqueue an AI call
  * @param {Object} requestOptions - Options for generateContent
+ * @param {Boolean} priority - If true, jump to the front of the queue
  * @returns {Promise<Object>} - Response object with text
  */
-function enqueueAICall(requestOptions) {
+function enqueueAICall(requestOptions, priority = false) {
     return new Promise((resolve, reject) => {
-        requestQueue.push({ requestOptions, resolve, reject, retries: 0 });
+        const item = { requestOptions, resolve, reject, retries: 0 };
+        if (priority) {
+            requestQueue.unshift(item);
+        } else {
+            requestQueue.push(item);
+        }
         processQueue();
     });
 }

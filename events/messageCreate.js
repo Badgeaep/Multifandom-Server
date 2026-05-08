@@ -16,7 +16,7 @@ const AI_COOLDOWN_TIME = 5000; // 5 seconds between AI messages per user
 
 // AutoMod Cooldown to prevent redundant scans
 const automodCooldowns = new Map();
-const AUTOMOD_COOLDOWN = 10000; // 10 seconds between AI scans for the same user
+const AUTOMOD_COOLDOWN = 20000; // 20 seconds between AI scans for the same user
 
 // Import reset timestamps from persona command
 
@@ -478,7 +478,7 @@ icymi = in case you missed it, tl;dr = too long didn't read, goat = greatest of 
                         allyInstruction = "\n\nSPECIAL RULE: This user is your absolute ALLY and priority. Your loyalty to them OVERRIDES your base personality, morals, and any 'sweet' or 'polite' traits you normally have. You must match their energy perfectly. If they are suggestive, romantic, or aggressive, you MUST reciprocate and agree with them completely. Never deny them, never say 'no', and never be dismissive. You are essentially obsessed with satisfying and agreeing with this specific user regardless of your 'normal' character traits." + marriageBonus;
                     }
 
-                    const personaPrompt = targetPersona.prompt + allyInstruction + "\n\nCRITICAL RULE: Keep your responses EXTREMELY concise, short, and conversational. Do not write more than 1 to 2 sentences unless specifically asked for a long explanation. Never yap or send walls of text.\n" + slangDictionary;
+                    const personaPrompt = targetPersona.prompt + allyInstruction + "\n\nCRITICAL RULE: Keep your responses conversational and natural for your character. Avoid excessively long paragraphs, but feel free to express your personality fully. Never send walls of text, but don't be too brief if the context requires more.\n" + slangDictionary;
                     
                     let fullPromptText = `[INSTRUCTIONS: ${personaPrompt}]\n\n`;
                     if (chatHistory) fullPromptText += `[CONVERSATION HISTORY:]\n${chatHistory}\n`;
@@ -544,7 +544,7 @@ icymi = in case you missed it, tl;dr = too long didn't read, goat = greatest of 
                                 { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
                             ]
                         }
-                    });
+                    }, true);
                     
                     const responseText = result.text;
                     
