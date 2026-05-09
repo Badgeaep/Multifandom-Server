@@ -28,12 +28,28 @@ module.exports = {
         .addStringOption(option =>
             option.setName('link')
                 .setDescription('Or paste a direct link to an image, video, or PDF')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('name')
+                .setDescription('Give your GIF a custom name (optional, random name if not provided)')
                 .setRequired(false)),
     async execute(interaction) {
         await interaction.deferReply();
 
+        // Check if the user is a member of the Multifandom server
+        const allowedGuildId = process.env.ALLOWED_GUILD_ID;
+        try {
+            const mainGuild = await interaction.client.guilds.fetch(allowedGuildId);
+            await mainGuild.members.fetch(interaction.user.id);
+        } catch {
+            return interaction.editReply({ 
+                content: '❌ You need to be in the **Multifandom** server to use `/gif`!\n\n🔗 Join here: https://discord.gg/ZN9b3PPaTJ' 
+            });
+        }
+
         const file = interaction.options.getAttachment('file');
         const link = interaction.options.getString('link');
+        const customName = interaction.options.getString('name');
 
         let targetUrl = null;
         let contentType = '';
@@ -46,6 +62,11 @@ module.exports = {
         } else {
             return interaction.editReply({ content: 'You need to attach a file or provide a link!' });
         }
+
+        // Generate GIF filename with watermark
+        const gifName = customName ? 
+            (customName.endsWith('.gif') ? customName.replace('.gif', '_multifandom.gif') : `${customName}_multifandom.gif`) : 
+            generateRandomGifName();
 
         try {
             // If we don't know the content type yet (link was provided), fetch the headers
@@ -65,7 +86,7 @@ module.exports = {
             if (isVideo) {
                 // --- VIDEO TO GIF ---
                 const gifBuffer = await videoToGif(targetUrl);
-                const attachment = new AttachmentBuilder(gifBuffer, { name: 'converted.gif' });
+                const attachment = new AttachmentBuilder(gifBuffer, { name: gifName });
                 const msg = await interaction.editReply({ files: [attachment] });
                 try { await msg.react('⭐'); } catch { /* reactions may not work in DMs */ }
             } else if (contentType.includes('pdf') || targetUrl.match(/\.pdf(\?|$)/i)) {
@@ -150,7 +171,7 @@ module.exports = {
                     })
                     .toBuffer();
 
-                const fileName = `page_${selectedPage}.gif`;
+                const fileName = gifName;
                 const attachment = new AttachmentBuilder(gifBuffer, { name: fileName });
                 const embed = new EmbedBuilder()
                     .setTitle(`📄 PDF Page ${selectedPage} Converted`)
@@ -190,7 +211,7 @@ module.exports = {
                     return;
                 }
 
-                const attachment = new AttachmentBuilder(gifBuffer, { name: 'hq_converted.gif' });
+                const attachment = new AttachmentBuilder(gifBuffer, { name: gifName });
                 const msg = await interaction.editReply({ files: [attachment] });
                 try { await msg.react('⭐'); } catch { /* reactions may not work in DMs */ }
             }
@@ -226,6 +247,14 @@ module.exports = {
         }
     },
 };
+
+/**
+ * Generates a random GIF filename with watermark
+ */
+function generateRandomGifName() {
+    const randomString = crypto.randomBytes(8).toString('hex');
+    return `gif_${randomString}_multifandom.gif`;
+}
 
 /**
  * Downloads a video from a URL and converts the first 3 seconds (or full video if ≤3s) to a GIF.
