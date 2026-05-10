@@ -359,7 +359,8 @@ module.exports = {
                 targetPersona = personaData.list.find(p => p.name === personaData.active);
             }
 
-            if (targetPersona && process.env.GEMINI_API_KEY) {
+            // Allow persona AI to run if any AI provider key is present (Gemini, Groq, or Ollama)
+            if (targetPersona && (process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.OLLAMA_API_KEY)) {
                 if (isQuotaExceeded()) {
                     const limitEmbed = new EmbedBuilder()
                         .setTitle('🔌 AI Out of Power')
@@ -547,23 +548,56 @@ icymi = in case you missed it, tl;dr = too long didn't read, goat = greatest of 
                     }, true);
                     
                     const responseText = result.text;
-                    
+                    // If the AI returned a suspiciously short/structured value like "text" or an object,
+                    // log the raw result for debugging so we can see why the bot replies with "text".
+                    try {
+                        const util = require('util');
+                        const isProblematic = (
+                            !responseText ||
+                            (typeof responseText === 'string' && (responseText.trim().length < 10 || responseText.trim().toLowerCase() === 'text' || responseText.trim().startsWith('{')))
+                            || (typeof responseText === 'object')
+                        );
+                        if (isProblematic) {
+                            console.warn('[AI DEBUG] Unexpected AI result — user=', message.author.id, 'persona=', targetPersona && targetPersona.name);
+                            console.warn('[AI DEBUG] Raw result:', util.inspect(result, { depth: 5, maxArrayLength: 50 }));
+                        }
+                    } catch (dbgErr) {
+                        console.error('Failed to dump AI result for debugging:', dbgErr);
+                    }
+
                     if (responseText) {
+                        // Normalize response to string to avoid `.trim()` errors when the
+                        // AI returned a non-string or structured object.
+                        let safeText;
+                        if (typeof responseText === 'string') {
+                            safeText = responseText;
+                        } else if (responseText && typeof responseText.text === 'string') {
+                            safeText = responseText.text;
+                        } else if (Array.isArray(responseText)) {
+                            safeText = responseText.join('\n');
+                        } else {
+                            try {
+                                safeText = JSON.stringify(responseText);
+                            } catch (e) {
+                                safeText = String(responseText);
+                            }
+                        }
+
                         updateQuestProgress(message.author.id, 'ai_chat');
                         // Use a webhook to change the display name for this specific message
                         try {
                             const webhooks = await message.channel.fetchWebhooks();
                             let webhook = webhooks.find(wh => wh.token && wh.owner.id === client.user.id);
-                            
+
                             if (!webhook) {
                                 webhook = await message.channel.createWebhook({
                                     name: 'Persona Webhook',
                                     avatar: client.user.displayAvatarURL(),
                                 });
                             }
-                            
-                            const cleanText = responseText.trim().replace(/\n+/g, '\n');
-                            
+
+                            const cleanText = safeText.trim().replace(/\n+/g, '\n');
+
                             const { isGhost } = require('../db');
                             const ping = isGhost(message.author.id, 'bot') ? `**${message.author.username}**` : `<@${message.author.id}>`;
 
@@ -574,7 +608,7 @@ icymi = in case you missed it, tl;dr = too long didn't read, goat = greatest of 
                             });
                         } catch (webhookErr) {
                             console.error('Failed to send webhook message, falling back to normal reply:', webhookErr);
-                            await message.reply(`**[${targetPersona.name}]**\n${responseText}`);
+                            await message.reply(`**[${targetPersona.name}]**\n${safeText}`);
                         }
                     }
                 } catch (err) {
